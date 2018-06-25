@@ -70,8 +70,6 @@ type (
 	// meaningful within a namespace.
 	namespacedFunctionReference struct {
 		namespace    string
-		refType      fission.FunctionReferenceType
-		functionName string
 		triggerName  string
 		triggerResourceVersion string
 	}
@@ -125,7 +123,7 @@ func (frr *functionReferenceResolver) resolve(trigger crd.HTTPTrigger) (*resolve
 
 	switch trigger.Spec.FunctionReference.Type {
 	case fission.FunctionReferenceTypeFunctionName:
-		rr, err = frr.resolveByName(nfr.namespace, nfr.functionName)
+		rr, err = frr.resolveByName(nfr.namespace, trigger.Spec.FunctionReference.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -137,7 +135,7 @@ func (frr *functionReferenceResolver) resolve(trigger crd.HTTPTrigger) (*resolve
 		}
 
 	default:
-		return nil, fmt.Errorf("Unrecognized function reference type %v", nfr.refType)
+		return nil, fmt.Errorf("Unrecognized function reference type %v", trigger.Spec.FunctionReference.Type)
 	}
 
 	// cache resolve result
@@ -215,11 +213,9 @@ func (frr *functionReferenceResolver) resolveByFunctionWeights(namespace string,
 	return &rr, nil
 }
 
-func (frr *functionReferenceResolver) delete(namespace string, refType fission.FunctionReferenceType, fnName, triggerName, triggerRV string) error {
+func (frr *functionReferenceResolver) delete(namespace string, triggerName, triggerRV string) error {
 	nfr := namespacedFunctionReference{
 		namespace:    namespace,
-		refType:      refType,
-		functionName: fnName,
 		triggerName:  triggerName,
 		triggerResourceVersion: triggerRV,
 	}

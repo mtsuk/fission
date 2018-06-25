@@ -102,10 +102,13 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 	// HTTP triggers setup by the user
 	homeHandled := false
 	for _, trigger := range ts.triggers {
+		log.Printf("Processing trigger: %s, trigger object : %+v", trigger.Metadata.Name, trigger)
 
 		// resolve function reference
 		rr, err := ts.resolver.resolve(trigger)
 		if err != nil {
+			log.Printf("Error resolving trigger: %s, err : %v", trigger.Metadata.Name, err)
+
 			// Unresolvable function reference. Report the error via
 			// the trigger's status.
 			go ts.updateTriggerStatusFailed(&trigger, err)
@@ -234,14 +237,12 @@ func (ts *HTTPTriggerSet) initFunctionController() (k8sCache.Store, k8sCache.Con
 
 				// update resolver function reference cache
 				for key, rr := range ts.resolver.copy() {
-					if key.refType == fission.FunctionReferenceTypeFunctionName &&
-						key.functionName == fn.Metadata.Name &&
-						key.namespace == fn.Metadata.Namespace &&
+					if key.namespace == fn.Metadata.Namespace &&
+							rr.functionMetadataMap[fn.Metadata.Name] != nil &&
 						rr.functionMetadataMap[fn.Metadata.Name].ResourceVersion != fn.Metadata.ResourceVersion {
-						//needResolverCacheInvalidation(key, rr, &fn.Metadata) {
 						// invalidate resolver cache
 						log.Printf("Invalidating resolver cache")
-						err := ts.resolver.delete(key.namespace, key.refType, key.functionName, key.triggerName, key.triggerResourceVersion)
+						err := ts.resolver.delete(key.namespace, key.triggerName, key.triggerResourceVersion)
 						if err != nil {
 							log.Printf("Error deleting functionReferenceResolver cache: %v", err)
 						}
