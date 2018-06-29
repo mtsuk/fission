@@ -27,6 +27,7 @@ import (
 	"github.com/fission/fission/crd"
 	"time"
 	"k8s.io/apimachinery/pkg/fields"
+
 )
 
 type canaryConfigMgr struct {
@@ -34,28 +35,33 @@ type canaryConfigMgr struct {
 	kubeClient        *kubernetes.Clientset
 	canaryConfigStore         k8sCache.Store
 	canaryConfigController    k8sCache.Controller
-	requestTracker *RequestTracker // this is only for local testing.
-	promClient *PrometheusClient
+	//requestTracker *RequestTracker // this is only for local testing.
+	promClient *PrometheusApiClient
 	crdClient         *rest.RESTClient
 }
 
 func MakeCanaryConfigMgr(fissionClient *crd.FissionClient, kubeClient *kubernetes.Clientset, crdClient *rest.RESTClient) (*canaryConfigMgr) {
 	// TODO : Use api end point of prometheus to verify it's target discovery is up even before we start this controller.
-	// GET /api/v1/status/config
+	// GET /api/v1/targets
 
 	configMgr := &canaryConfigMgr{
 		fissionClient: fissionClient,
 		kubeClient: kubeClient,
 		crdClient: crdClient,
-		requestTracker: makeRequestTracker(),
-
+		//requestTracker: makeRequestTracker(),
+		// TODO : Remove this hard code after testing
+		promClient: makePrometheusClient("http://smelly-wildebeest-prometheus-server"),
 	}
 
-	store, controller := configMgr.initCanaryConfigController()
-	configMgr.canaryConfigStore = store
-	configMgr.canaryConfigController = controller
+	//store, controller := configMgr.initCanaryConfigController()
+	//configMgr.canaryConfigStore = store
+	//configMgr.canaryConfigController = controller
 
-	// TODO : Also start a go routine on startup to restart processing all canaryConfigs in the event of router restart
+	log.Printf("Invoking promClient.GetFunctionFailurePercentage")
+	configMgr.promClient.GetFunctionFailurePercentage("fna-v2", "default")
+	log.Printf("Finished invoking promClient.GetFunctionFailurePercentage")
+
+	// TODO : Also start a go routine on startup to restart processing all canaryConfigs in the event of controller restart
 	// in the middle of incrementing weights of funcN and decrementing funcN-1
 
 	return configMgr

@@ -100,6 +100,7 @@ func Start(port int, executorUrl string) {
 	executor := executorClient.MakeClient(executorUrl)
 
 	setupCanaryLoadBalancer()
+	log.Printf("Making canary config mgr from router")
 	canaryconfigmgr.MakeCanaryConfigMgr(fissionClient, kubeClient, restClient)
 
 	triggers, _, fnStore := makeHTTPTriggerSet(fmap, fissionClient, kubeClient, executor, restClient)
