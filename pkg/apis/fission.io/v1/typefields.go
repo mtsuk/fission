@@ -335,6 +335,6 @@ type (
 	TriggerReference struct {
 		Namespace string `json:"namespace"`
 		Name      string `json:"name"`
-		ResourceVersion string `json:"resourceversion,omitempty"`
+		//ResourceVersion string `json:"resourceversion,omitempty"`
 	}
 )

@@ -107,7 +107,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 		// resolve function reference
 		rr, err := ts.resolver.resolve(trigger)
 		if err != nil {
-			log.Printf("Error resolving trigger: %s, err : %v", trigger.Metadata.Name, err)
+			//log.Printf("Error resolving trigger: %s, err : %v", trigger.Metadata.Name, err)
 
 			// Unresolvable function reference. Report the error via
 			// the trigger's status.
@@ -122,7 +122,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 			log.Panicf("resolve result type not implemented (%v)", rr.resolveResultType)
 		}
 
-		fh := functionHandler{
+		fh := &functionHandler{
 			fmap:         ts.functionServiceMap,
 			functionMetadataMap:  rr.functionMetadataMap,
 			fnWeightDistributionList: rr.functionWtDistributionList,
@@ -130,7 +130,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 			httpTrigger:  &trigger,
 		}
 
-		log.Printf("Dumping fh object : %+v", fh)
+		//log.Printf("Dumping fh object : %+v", fh)
 
 		if rr.resolveResultType == resolveResultSingleFunction {
 			for _, metadata := range fh.functionMetadataMap {
@@ -140,7 +140,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 
 		//log.Printf("Setting up url %s handler %+v", trigger.Spec.RelativeURL, *fh)
 
-		ht := muxRouter.HandleFunc(trigger.Spec.RelativeURL, fh.handler)
+		ht := muxRouter.HandleFunc(trigger.Spec.RelativeURL, (*fh).handler)
 		ht.Methods(trigger.Spec.Method)
 		if trigger.Spec.Host != "" {
 			ht.Host(trigger.Spec.Host)
@@ -231,9 +231,6 @@ func (ts *HTTPTriggerSet) initFunctionController() (k8sCache.Store, k8sCache.Con
 			},
 			UpdateFunc: func(oldObj interface{}, newObj interface{}) {
 				fn := newObj.(*crd.Function)
-
-				// TODO : We need to make this more efficient. IMO, we do not need to copy the whole cache again.
-				// Need to double check with Soam and ta-ching.
 
 				// update resolver function reference cache
 				for key, rr := range ts.resolver.copy() {

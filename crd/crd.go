@@ -187,8 +187,8 @@ func EnsureFissionCRDs(clientset *apiextensionsclient.Clientset) error {
 				Scope:   apiextensionsv1beta1.NamespaceScoped,
 				Names: apiextensionsv1beta1.CustomResourceDefinitionNames{
 					Kind:     "CanaryConfig",
-					Plural:   "canaryConfigs",
-					Singular: "canaryConfig",
+					Plural:   "canaryconfigs",
+					Singular: "canaryconfig",
 				},
 			},
 		},

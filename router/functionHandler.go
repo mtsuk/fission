@@ -105,12 +105,6 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 		needExecutor = true
 	}
 
-	dumpResponse := func() {
-		log.Printf("Response status : %v, resp : %+v, err : %v", resp.StatusCode, resp, err)
-	}
-
-	defer dumpResponse()
-
 	for i := 0; i < roundTripper.maxRetries-1; i++ {
 		if needExecutor {
 			log.Printf("Calling getServiceForFunction for function: %s", roundTripper.funcHandler.function.Name)
@@ -119,6 +113,7 @@ func (roundTripper RetryingRoundTripper) RoundTrip(req *http.Request) (resp *htt
 			service, err := roundTripper.funcHandler.executor.GetServiceForFunction(
 				roundTripper.funcHandler.function)
 			if err != nil {
+				log.Printf("Err from GetServiceForFunction : %v", err)
 				// We might want a specific error code or header for fission failures as opposed to
 				// user function bugs.
 				return nil, err
@@ -242,7 +237,7 @@ func (fh functionHandler) handler(responseWriter http.ResponseWriter, request *h
 		log.Printf("chosen fnBackend's metadata : %+v", fh.function)
 	}
 
-	log.Printf("Outside of refType comparison")
+	log.Printf("Outside of refType comparison, fh.function = %v", fh.function)
 
 	// system params
 	MetadataToHeaders(HEADERS_FISSION_FUNCTION_PREFIX, fh.function, request)

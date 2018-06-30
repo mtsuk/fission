@@ -5,31 +5,29 @@ import (
 	"time"
 	"golang.org/x/net/context"
 
-	promApi "github.com/prometheus/client_golang/api/prometheus"
+	promApi1 "github.com/prometheus/client_golang/api/prometheus"
 	"github.com/prometheus/common/model"
 	log "github.com/sirupsen/logrus"
-	"math"
 )
 
 type PrometheusApiClient struct {
-	client promApi.QueryAPI
-	// Add more stuff later
+	client promApi1.QueryAPI
 }
 
 // TODO  prometheusSvc will need to come from helm chart value and passed to controller pod.
 // controllerpod then passes this during canaryConfigMgr create
 func makePrometheusClient(prometheusSvc string) *PrometheusApiClient {
 	log.Printf("Making prom client with service : %s", prometheusSvc)
-	promApiConfig := promApi.Config{
+	promApiConfig := promApi1.Config{
 		Address: prometheusSvc,
 	}
 
-	promApiClient, err := promApi.New(promApiConfig)
+	promApiClient, err := promApi1.New(promApiConfig)
 	if err != nil {
 		log.Errorf("Error creating prometheus api client for svc : %s, err : %v", prometheusSvc, err)
 	}
 
-	apiQueryClient := promApi.NewQueryAPI(promApiClient)
+	apiQueryClient := promApi1.NewQueryAPI(promApiClient)
 
 	log.Printf("Successfully made prom client")
 	return &PrometheusApiClient{
@@ -37,66 +35,98 @@ func makePrometheusClient(prometheusSvc string) *PrometheusApiClient {
 	}
 }
 
-// TODO: Refine
-func(promApi *PrometheusApiClient) GetFunctionFailurePercentage(funcName string, funcNs string, errorWindow time.Duration) float64{
-
-	queryString := fmt.Sprintf("fission_function_calls_total{name=\"%s\",namespace=\"%s\"}", funcName, funcNs)
-	//queryString := fmt.Sprintf("fission_function_errors_total")
-	log.Printf("Making query towards prom api server, queryString : %s", queryString)
-	val, err := promApi.client.Query(context.Background(), queryString, time.Now())
+func(promApi *PrometheusApiClient) GetTotalRequestToUrl(path string, method string, window time.Duration) float64 {
+	queryString := fmt.Sprintf("fission_function_calls_total{path=\"%s\",method=\"%s\"}", path, method)
+	log.Printf("Querying total function calls for : %s in time window : %v", queryString, window)
+	rangeTime  := promApi1.Range{
+		End: time.Now(),
+		Start: time.Now().Add(-window),
+		Step: window,
+	}
+	val, err := promApi.client.QueryRange(context.Background(), queryString, rangeTime)
 	if err != nil {
-		log.Errorf("Error querying prometheus for fission_function_calls_total, err : %v", err)
+		log.Errorf("Error querying prometheus for queryrange, qs : %v, rangeTime : %v, err : %v", queryString, rangeTime, err)
 	}
 
 	log.Printf("Value retrieved from query : %v", val)
 
-	functionCallTotal := extractValueFromQueryResult(val)
+	totalRequestToUrl := extractValueFromQueryResult(val)
+	log.Printf("total calls to this url %v method %v : %v", path, method, totalRequestToUrl)
 
-	queryString = fmt.Sprintf("fission_function_errors_total{name=\"%s\",namespace=\"%s\"}", funcName, funcNs)
-	log.Printf("Making query towards prom api server, queryString : %s", queryString)
-	val, err = promApi.client.Query(context.Background(), queryString, time.Now())
+	return totalRequestToUrl
+}
+
+func (promApi *PrometheusApiClient) GetTotalFailedRequestsToFunc(funcName string, funcNs string, window time.Duration) float64 {
+	queryString := fmt.Sprintf("fission_function_errors_total{name=\"%s\",namespace=\"%s\"}", funcName, funcNs)
+	log.Printf("Querying fission_function_errors_total qs : %s in time window : %v", queryString, window)
+	rangeTime  := promApi1.Range{
+		End: time.Now(),
+		Start: time.Now().Add(-window),
+		Step: window,
+	}
+	val, err := promApi.client.QueryRange(context.Background(), queryString, rangeTime)
 	if err != nil {
-		log.Errorf("Error querying prometheus for fission_function_errors_total, err : %v", err)
+		log.Errorf("Error querying prometheus for queryrange, qs : %v, rangeTime : %v, err : %v", queryString, rangeTime, err)
 	}
 
 	log.Printf("Value retrieved from query : %v", val)
 
-	functionErrNow := extractValueFromQueryResult(val)
+	totalFailedRequestToFunc := extractValueFromQueryResult(val)
+	log.Printf("total failed calls to function: %v.%v : %v", funcName, funcNs, window)
 
-	queryString = fmt.Sprintf("fission_function_errors_total{name=\"%s\",namespace=\"%s\"}", funcName, funcNs)
-	log.Printf("Making query towards prom api server, queryString : %s", queryString)
-	val, err = promApi.client.Query(context.Background(), queryString, time.Now().Add(-errorWindow))
-	if err != nil {
-		log.Errorf("Error querying prometheus for fission_function_errors_total for errorWindow, err : %v", err)
+	return totalFailedRequestToFunc
+}
+
+func(promApi *PrometheusApiClient) GetFunctionFailurePercentage(path, method, funcName, funcNs string, window time.Duration) float64{
+
+	// first get a total count of requests to this url in a time window
+	totalRequestToUrl := promApi.GetTotalRequestToUrl(path, method, window)
+
+	if totalRequestToUrl == 0 {
+		return -1
 	}
 
-	log.Printf("Value retrieved from query : %v", val)
+	// next, get a total count of errored out requests to this function in the same window
+	totalFailedRequestToFunc := promApi.GetTotalFailedRequestsToFunc(funcName, funcNs, window)
 
-	functionErrPrev := extractValueFromQueryResult(val)
+	// calculate the failure percentage of the function
+	failurePercentForFunc := (totalFailedRequestToFunc / totalRequestToUrl) * 100
+	log.Printf("Final failurePercentForFunc for func: %v.%v is %v", funcName, funcNs, failurePercentForFunc)
 
-	functionErrRate := math.Abs(functionErrPrev - functionErrNow)
-
-	// This should give us the err percentage for this function from previous time window.
-	return (functionErrRate / functionCallTotal) * 100
-
+	return failurePercentForFunc
 }
 
 func extractValueFromQueryResult(val model.Value) float64 {
 	switch {
 	case val.Type() == model.ValScalar:
+		log.Printf("Value type is scalar")
 		scalarVal := val.(*model.Scalar)
-		log.Printf("scalarValue : %v", scalarVal)
-		log.Printf("Cannot be scalar. query should return vector")
-		return 0
+		log.Printf("scalarValue : %v", scalarVal.Value)
+		return float64(scalarVal.Value)
 
 		// handle scalar stuff
 	case val.Type() == model.ValVector:
+		log.Printf("value type is vector")
 		vectorVal := val.(model.Vector)
 		total := float64(0)
 		for _, elem := range vectorVal {
 			log.Printf("labels : %v, Elem value : %v, timestamp : %v", elem.Metric, elem.Value, elem.Timestamp)
 			total = total + float64(elem.Value)
 		}
+		return total
+
+	case val.Type() == model.ValMatrix:
+		log.Printf("value type is matrix")
+		matrixVal := val.(model.Matrix)
+		total := float64(0)
+		for _, elem := range matrixVal {
+			log.Printf("labels : %v ", elem.Metric)
+			for _, elemValue := range elem.Values {
+				log.Printf("value : %v", elemValue.Value)
+				total = total + float64(elemValue.Value)
+			}
+		}
+		log.Printf("Final total : %v", total)
 		return total
 
 	default:
