@@ -107,8 +107,8 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 		case <- ticker.C:
 			// every weightIncrementDuration, check if failureThreshold has reached.
 			// if yes, rollback.
-			// else, increment the weight percentage of funcN and decrement funcN-1 by `weightIncrement`
-			canaryCfgMgr.IncrementWeightDistributionOrRollback(canaryConfig, quit)
+			// else, increment the weight of funcN and decrement funcN-1 by `weightIncrement`
+			canaryCfgMgr.IncrementWeightOrRollback(canaryConfig, quit)
 
 		case <- quit:
 			// we're done processing this canary config either because the new function receives 100% of the traffic
@@ -119,7 +119,7 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 	}
 }
 
-func(canaryCfgMgr *canaryConfigMgr) IncrementWeightDistributionOrRollback(canaryConfig *crd.CanaryConfig, quit chan struct{}) {
+func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.CanaryConfig, quit chan struct{}) {
 	// get the http trigger object associated with this canary config
 	triggerObj, err := canaryCfgMgr.getHttpTriggerObject(canaryConfig.Spec.Trigger.Name, canaryConfig.Spec.Trigger.Namespace)
 	if err != nil {
@@ -140,7 +140,7 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightDistributionOrRollback(canary
 
 	// TODO : The right thing to do here is not pass the trigger object. because we might run into `StatusConflict` issue
 	// change it to do a get and then update inside rollback
-	if int(failurePercent) > canaryConfig.Spec.FailureThreshold {
+	if int(failurePercent) >= canaryConfig.Spec.FailureThreshold {
 		canaryCfgMgr.rollback(canaryConfig, triggerObj)
 		close(quit)
 		return
@@ -153,7 +153,7 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightDistributionOrRollback(canary
 		return
 	}
 	if doneProcessingCanaryConfig {
-		log.Printf("We're done processing canary config : %s since the new function is receiving all the traffic", canaryConfig.Metadata.Name)
+		log.Printf("We're done processing canary config : %s. The new function is receiving all the traffic", canaryConfig.Metadata.Name)
 		close(quit)
 		return
 	}
@@ -178,6 +178,8 @@ func(canaryCfgMgr *canaryConfigMgr) rollback(canaryConfig *crd.CanaryConfig, tri
 		log.Printf("Error updating http trigger object, err : %v", err)
 		return err
 	}
+
+	return nil
 }
 
 func(canaryCfgMgr *canaryConfigMgr) incrementWeights(canaryConfig *crd.CanaryConfig, trigger *crd.HTTPTrigger) (bool, error) {
