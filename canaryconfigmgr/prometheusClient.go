@@ -16,7 +16,7 @@ type PrometheusApiClient struct {
 
 // TODO  prometheusSvc will need to come from helm chart value and passed to controller pod.
 // controllerpod then passes this during canaryConfigMgr create
-func makePrometheusClient(prometheusSvc string) *PrometheusApiClient {
+func MakePrometheusClient(prometheusSvc string) *PrometheusApiClient {
 	log.Printf("Making prom client with service : %s", prometheusSvc)
 	promApiConfig := promApi1.Config{
 		Address: prometheusSvc,

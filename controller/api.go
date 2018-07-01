@@ -33,6 +33,7 @@ import (
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	"github.com/fission/fission/fission/logdb"
+	"github.com/fission/fission/canaryconfigmgr"
 )
 
 type (
@@ -44,6 +45,7 @@ type (
 		workflowApiUrl    string
 		functionNamespace string
 		useIstio          bool
+		promClient *canaryconfigmgr.PrometheusApiClient
 	}
 
 	logDBConfig struct {
@@ -83,6 +85,8 @@ func MakeAPI() (*API, error) {
 	} else {
 		api.functionNamespace = "fission-function"
 	}
+
+	api.promClient = canaryconfigmgr.MakePrometheusClient("http://smelly-wildebeest-prometheus-server")
 
 	return api, err
 }
@@ -218,6 +222,10 @@ func (api *API) Serve(port int) {
 
 	r.HandleFunc("/v2/secrets/{secret}", api.SecretGet).Methods("GET")
 	r.HandleFunc("/v2/configmaps/{configmap}", api.ConfigMapGet).Methods("GET")
+
+	r.HandleFunc("/v2/metrics/requests", api.TotalRequestsToUrl).Methods("GET")
+	r.HandleFunc("/v2/metrics/error-requests", api.TotalErrRequestCount).Methods("GET")
+
 
 	r.HandleFunc("/proxy/{dbType}", api.FunctionLogsApiPost).Methods("POST")
 	r.HandleFunc("/proxy/storage/v1/archive", api.StorageServiceProxy)
