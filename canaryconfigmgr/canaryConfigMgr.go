@@ -46,7 +46,7 @@ func MakeCanaryConfigMgr(fissionClient *crd.FissionClient, kubeClient *kubernete
 		kubeClient: kubeClient,
 		crdClient: crdClient,
 		// TODO : Remove this hard code after testing and have a check for prometheus service being up
-		promClient: makePrometheusClient("http://smelly-wildebeest-prometheus-server"),
+		promClient: MakePrometheusClient("http://smelly-wildebeest-prometheus-server"),
 	}
 
 	store, controller := configMgr.initCanaryConfigController()
@@ -128,8 +128,13 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 		return
 	}
 
-	failurePercent := canaryCfgMgr.promClient.GetFunctionFailurePercentage(triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
+	failurePercent, err := canaryCfgMgr.promClient.GetFunctionFailurePercentage(triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
 		canaryConfig.Spec.FunctionN, canaryConfig.Metadata.Namespace, canaryConfig.Spec.WeightIncrementDuration)
+	if err != nil {
+		// just silently ignore. wait for next window to increment weight
+		log.Printf("Error calculating failure percentage, err : %v", err)
+		return
+	}
 
 	if failurePercent == -1 {
 		// this means there were no requests triggered to this url during this window. return here and check back

@@ -37,7 +37,11 @@ func (a *API) TotalRequestsToUrl(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := a.promClient.GetTotalRequestToUrl(url, method, timeDuration)
+	result, err := a.promClient.GetTotalRequestToUrl(url, method, timeDuration)
+	if err != nil {
+		a.respondWithError(w, err)
+		return
+	}
 
 	resp, err := json.Marshal(result)
 	if err != nil {
@@ -61,7 +65,11 @@ func (a *API) TotalErrRequestCount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result := a.promClient.GetTotalFailedRequestsToFunc(url, method, timeDuration)
+	result, err := a.promClient.GetTotalFailedRequestsToFunc(url, method, timeDuration)
+	if err != nil {
+		a.respondWithError(w, err)
+		return
+	}
 
 	resp, err := json.Marshal(result)
 	if err != nil {
