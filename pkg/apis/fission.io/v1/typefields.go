@@ -18,7 +18,6 @@ package v1
 
 import (
 	apiv1 "k8s.io/api/core/v1"
-	"time"
 )
 
 type (
@@ -326,7 +325,7 @@ type (
 		FunctionN string `json:"funcn"`
 		FunctionNminus1 string `json:"funcn-1"`
 		WeightIncrement int `json:"weightincrement"`
-		WeightIncrementDuration time.Duration `json:"duration"`
+		WeightIncrementDuration string `json:"duration"`
 		FailureThreshold int `json:"failurethreshold"`
 		FailureType FailureType `json:"failureType"`
 	}

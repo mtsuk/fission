@@ -36,53 +36,36 @@ func MakePrometheusClient(prometheusSvc string) *PrometheusApiClient {
 	}
 }
 
-// TODO : Add retries in cases of dial tcp error
-func(promApi *PrometheusApiClient) GetTotalRequestToUrl(path string, method string, window time.Duration) (float64, error) {
-	queryString := fmt.Sprintf("fission_function_calls_total{path=\"%s\",method=\"%s\"}", path, method)
-	log.Printf("Querying total function calls for : %s in time window : %v", queryString, window)
-	rangeTime  := promApi1.Range{
-		End: time.Now(),
-		Start: time.Now().Add(-window),
-		Step: window,
-	}
-	val, err := promApi.client.QueryRange(context.Background(), queryString, rangeTime)
+func(promApi *PrometheusApiClient) GetTotalRequestToUrl(path string, method string, window string) (float64, error) {
+	queryString := fmt.Sprintf("fission_function_calls_total{path=\"%s\",method=\"%s\"}[%v]", path, method, window)
+	log.Printf("Querying total function calls for : %s ", queryString)
+
+	totalRequestToUrl, err := promApi.executeQuery(queryString)
 	if err != nil {
-		log.Errorf("Error querying prometheus for queryrange, qs : %v, rangeTime : %v, err : %v", queryString, rangeTime, err)
+		log.Printf("Error executing query : %s, err : %v", queryString, err)
 		return 0, err
 	}
 
-	log.Printf("Value retrieved from query : %v", val)
-
-	totalRequestToUrl := extractValueFromQueryResult(val)
 	log.Printf("total calls to this url %v method %v : %v", path, method, totalRequestToUrl)
 
 	return totalRequestToUrl, nil
 }
 
-// TODO : Add retries in cases of dial tcp error
-func (promApi *PrometheusApiClient) GetTotalFailedRequestsToFunc(funcName string, funcNs string, window time.Duration) (float64, error) {
-	queryString := fmt.Sprintf("fission_function_errors_total{name=\"%s\",namespace=\"%s\"}", funcName, funcNs)
-	log.Printf("Querying fission_function_errors_total qs : %s in time window : %v", queryString, window)
-	rangeTime  := promApi1.Range{
-		End: time.Now(),
-		Start: time.Now().Add(-window),
-		Step: window,
-	}
-	val, err := promApi.client.QueryRange(context.Background(), queryString, rangeTime)
+func (promApi *PrometheusApiClient) GetTotalFailedRequestsToFunc(funcName string, funcNs string, path string, window string) (float64, error) {
+	queryString := fmt.Sprintf("fission_function_errors_total{name=\"%s\",namespace=\"%s\",path=\"%s\"}[%v]", funcName, funcNs, path, window)
+	log.Printf("Querying fission_function_errors_total qs : %s", queryString)
+
+	totalFailedRequestToFunc, err := promApi.executeQuery(queryString)
 	if err != nil {
-		log.Errorf("Error querying prometheus for queryrange, qs : %v, rangeTime : %v, err : %v", queryString, rangeTime, err)
+		log.Printf("Error executing query : %s, err : %v", queryString, err)
 		return 0, err
 	}
-
-	log.Printf("Value retrieved from query : %v", val)
-
-	totalFailedRequestToFunc := extractValueFromQueryResult(val)
 	log.Printf("total failed calls to function: %v.%v : %v", funcName, funcNs, window)
 
 	return totalFailedRequestToFunc, nil
 }
 
-func(promApi *PrometheusApiClient) GetFunctionFailurePercentage(path, method, funcName, funcNs string, window time.Duration) (float64, error) {
+func(promApi *PrometheusApiClient) GetFunctionFailurePercentage(path, method, funcName, funcNs string, window string) (float64, error) {
 
 	// first get a total count of requests to this url in a time window
 	totalRequestToUrl, err := promApi.GetTotalRequestToUrl(path, method, window)
@@ -95,7 +78,7 @@ func(promApi *PrometheusApiClient) GetFunctionFailurePercentage(path, method, fu
 	}
 
 	// next, get a total count of errored out requests to this function in the same window
-	totalFailedRequestToFunc, err := promApi.GetTotalFailedRequestsToFunc(funcName, funcNs, window)
+	totalFailedRequestToFunc, err := promApi.GetTotalFailedRequestsToFunc(funcName, funcNs, path, window)
 	if err != nil {
 		return 0, err
 	}
@@ -107,15 +90,23 @@ func(promApi *PrometheusApiClient) GetFunctionFailurePercentage(path, method, fu
 	return failurePercentForFunc, nil
 }
 
-func extractValueFromQueryResult(val model.Value) float64 {
+func(promApi *PrometheusApiClient) executeQuery(queryString string) (float64, error) {
+	val, err := promApi.client.Query(context.Background(), queryString, time.Now())
+	if err != nil {
+		// TODO : Add retries in cases of dial tcp error
+		log.Errorf("Error querying prometheus qs : %v, err : %v", queryString, err)
+		return 0, err
+	}
+
+	log.Printf("Value retrieved from query : %v", val)
+
 	switch {
 	case val.Type() == model.ValScalar:
 		log.Printf("Value type is scalar")
 		scalarVal := val.(*model.Scalar)
 		log.Printf("scalarValue : %v", scalarVal.Value)
-		return float64(scalarVal.Value)
+		return float64(scalarVal.Value), nil
 
-		// handle scalar stuff
 	case val.Type() == model.ValVector:
 		log.Printf("value type is vector")
 		vectorVal := val.(model.Vector)
@@ -124,7 +115,7 @@ func extractValueFromQueryResult(val model.Value) float64 {
 			log.Printf("labels : %v, Elem value : %v, timestamp : %v", elem.Metric, elem.Value, elem.Timestamp)
 			total = total + float64(elem.Value)
 		}
-		return total
+		return total, nil
 
 	case val.Type() == model.ValMatrix:
 		log.Printf("value type is matrix")
@@ -145,10 +136,10 @@ func extractValueFromQueryResult(val model.Value) float64 {
 			}
 		}
 		log.Printf("Final total : %v", total)
-		return total
+		return total, nil
 
 	default:
 		log.Printf("type unrecognized")
-		return 0
+		return 0,nil
 	}
 }

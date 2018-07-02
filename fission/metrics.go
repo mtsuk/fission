@@ -23,10 +23,11 @@ func metricsTotalErrorCount(c *cli.Context) error {
 	client := getClient(c.GlobalString("server"))
 
 	fn := c.String("function")
-	ns := c.String("namespace")
+	ns := "default"
+	url := c.String("url")
 	window := c.String("window")
 
-	result, err := client.TotalErrorRequestToFuncGet(fn, ns, window)
+	result, err := client.TotalErrorRequestToFuncGet(fn, ns, window, url)
 	checkErr(err, "get metricsTotalReqCount")
 
 	fmt.Println(result)

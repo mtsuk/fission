@@ -46,9 +46,9 @@ func (c *Client) TotalRequestToUrlGet(url, method, window string) (float64, erro
 	return result, nil
 }
 
-func (c *Client) TotalErrorRequestToFuncGet(function, namespace, window string) (float64, error) {
+func (c *Client) TotalErrorRequestToFuncGet(function, namespace, window, url string) (float64, error) {
 	relativeUrl := "metrics/error-requests"
-	relativeUrl += fmt.Sprintf("?function=%v&namespace=%v&window=%v", function, namespace, window)
+	relativeUrl += fmt.Sprintf("?function=%v&namespace=%v&window=%v&path=%v", function, namespace, window, url)
 
 	resp, err := http.Get(c.url(relativeUrl))
 	if err != nil {

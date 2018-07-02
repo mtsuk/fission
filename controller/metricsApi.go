@@ -19,9 +19,6 @@ package controller
 import (
 	"encoding/json"
 	"net/http"
-
-	log "github.com/sirupsen/logrus"
-	"time"
 )
 
 func (a *API) TotalRequestsToUrl(w http.ResponseWriter, r *http.Request) {
@@ -30,14 +27,14 @@ func (a *API) TotalRequestsToUrl(w http.ResponseWriter, r *http.Request) {
 	url := a.extractQueryParamFromRequest(r, "url")
 	method := a.extractQueryParamFromRequest(r, "method")
 	timeDurationStr := a.extractQueryParamFromRequest(r, "window")
-	timeDuration, err := time.ParseDuration(timeDurationStr)
-	if err != nil {
-		log.Printf("Error parsing time duration :%v", err)
-		a.respondWithError(w, err)
-		return
-	}
+	//timeDuration, err := time.ParseDuration(timeDurationStr)
+	//if err != nil {
+	//	log.Printf("Error parsing time duration :%v", err)
+	//	a.respondWithError(w, err)
+	//	return
+	//}
 
-	result, err := a.promClient.GetTotalRequestToUrl(url, method, timeDuration)
+	result, err := a.promClient.GetTotalRequestToUrl(url, method, timeDurationStr)
 	if err != nil {
 		a.respondWithError(w, err)
 		return
@@ -55,17 +52,18 @@ func (a *API) TotalRequestsToUrl(w http.ResponseWriter, r *http.Request) {
 func (a *API) TotalErrRequestCount(w http.ResponseWriter, r *http.Request) {
 	//vars := mux.Vars(r)
 	//name := vars["configmap"]
-	url := a.extractQueryParamFromRequest(r, "function")
-	method := a.extractQueryParamFromRequest(r, "namespace")
+	fn := a.extractQueryParamFromRequest(r, "function")
+	fns := a.extractQueryParamFromRequest(r, "namespace")
+	url := a.extractQueryParamFromRequest(r, "path")
 	timeDurationStr := a.extractQueryParamFromRequest(r, "window")
-	timeDuration, err := time.ParseDuration(timeDurationStr)
-	if err != nil {
-		log.Printf("Error parsing time duration :%v", err)
-		a.respondWithError(w, err)
-		return
-	}
+	//timeDuration, err := time.ParseDuration(timeDurationStr)
+	//if err != nil {
+	//	log.Printf("Error parsing time duration :%v", err)
+	//	a.respondWithError(w, err)
+	//	return
+	//}
 
-	result, err := a.promClient.GetTotalFailedRequestsToFunc(url, method, timeDuration)
+	result, err := a.promClient.GetTotalFailedRequestsToFunc(fn, fns, url, timeDurationStr)
 	if err != nil {
 		a.respondWithError(w, err)
 		return

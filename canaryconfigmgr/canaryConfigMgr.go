@@ -94,8 +94,15 @@ func(canaryCfgMgr *canaryConfigMgr) addCanaryConfig(canaryConfig *crd.CanaryConf
 }
 
 func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, canaryConfig *crd.CanaryConfig) {
-	ticker := time.NewTicker(canaryConfig.Spec.WeightIncrementDuration)
+	timeDuration, err := time.ParseDuration(canaryConfig.Spec.WeightIncrementDuration)
+	if err != nil {
+		log.Printf("Error parsing time duration :%v", err)
+		return
+	}
+
+	ticker := time.NewTicker(timeDuration)
 	quit := make(chan struct{})
+	firstIteration := true
 
 	for {
 		select {
@@ -108,7 +115,7 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 			// every weightIncrementDuration, check if failureThreshold has reached.
 			// if yes, rollback.
 			// else, increment the weight of funcN and decrement funcN-1 by `weightIncrement`
-			canaryCfgMgr.IncrementWeightOrRollback(canaryConfig, quit)
+			canaryCfgMgr.IncrementWeightOrRollback(canaryConfig, quit, &firstIteration)
 
 		case <- quit:
 			// we're done processing this canary config either because the new function receives 100% of the traffic
@@ -119,7 +126,7 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 	}
 }
 
-func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.CanaryConfig, quit chan struct{}) {
+func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.CanaryConfig, quit chan struct{}, firstIteration *bool) {
 	// get the http trigger object associated with this canary config
 	triggerObj, err := canaryCfgMgr.getHttpTriggerObject(canaryConfig.Spec.Trigger.Name, canaryConfig.Spec.Trigger.Namespace)
 	if err != nil {
@@ -128,12 +135,16 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 		return
 	}
 
-	failurePercent, err := canaryCfgMgr.promClient.GetFunctionFailurePercentage(triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
+	var failurePercent float64
+	if ! *firstIteration {
+		*firstIteration = false
+		failurePercent, err = canaryCfgMgr.promClient.GetFunctionFailurePercentage(triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
 		canaryConfig.Spec.FunctionN, canaryConfig.Metadata.Namespace, canaryConfig.Spec.WeightIncrementDuration)
-	if err != nil {
-		// just silently ignore. wait for next window to increment weight
-		log.Printf("Error calculating failure percentage, err : %v", err)
-		return
+		if err != nil {
+			// silently ignore. wait for next window to increment weight
+			log.Printf("Error calculating failure percentage, err : %v", err)
+			return
+		}
 	}
 
 	if failurePercent == -1 {
@@ -145,7 +156,7 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 
 	// TODO : The right thing to do here is not pass the trigger object. because we might run into `StatusConflict` issue
 	// change it to do a get and then update inside rollback
-	if int(failurePercent) >= canaryConfig.Spec.FailureThreshold {
+	if int(failurePercent) > canaryConfig.Spec.FailureThreshold {
 		canaryCfgMgr.rollback(canaryConfig, triggerObj)
 		close(quit)
 		return
@@ -157,12 +168,12 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 		log.Printf("Error incrementing weights for triggerObj : %v, err : %v", triggerObj.Metadata.Name, err)
 		return
 	}
+
 	if doneProcessingCanaryConfig {
 		log.Printf("We're done processing canary config : %s. The new function is receiving all the traffic", canaryConfig.Metadata.Name)
 		close(quit)
 		return
 	}
-
 }
 
 func(canaryCfgMgr *canaryConfigMgr) getHttpTriggerObject(triggerName, triggerNamespace string) (*crd.HTTPTrigger, error) {

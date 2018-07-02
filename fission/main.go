@@ -269,7 +269,7 @@ func main() {
 	windowFlag := cli.StringFlag{Name: "window", Usage: "time window string in time.Duration format https://golang.org/pkg/time/#ParseDuration"}
 	metricsSubCommands := []cli.Command{
 		{Name: "total-count", Usage: "total count of requests for url", Flags: []cli.Flag{urlFlag, urlMethodFlag, windowFlag}, Action: metricsTotalReqCount},
-		{Name: "error", Usage: "count of errored requests to function", Flags: []cli.Flag{fnMetricsNameFlag, windowFlag}, Action: metricsTotalErrorCount},
+		{Name: "error", Usage: "count of errored requests to function", Flags: []cli.Flag{fnMetricsNameFlag, windowFlag, urlFlag}, Action: metricsTotalErrorCount},
 	}
 
 
