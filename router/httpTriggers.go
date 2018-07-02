@@ -101,7 +101,8 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 
 	// HTTP triggers setup by the user
 	homeHandled := false
-	for _, trigger := range ts.triggers {
+	for i := range ts.triggers {
+		trigger := ts.triggers[i]
 		log.Printf("Processing trigger: %s, trigger object : %+v", trigger.Metadata.Name, trigger)
 
 		// resolve function reference
@@ -140,7 +141,7 @@ func (ts *HTTPTriggerSet) getRouter() *mux.Router {
 
 		//log.Printf("Setting up url %s handler %+v", trigger.Spec.RelativeURL, *fh)
 
-		ht := muxRouter.HandleFunc(trigger.Spec.RelativeURL, (*fh).handler)
+		ht := muxRouter.HandleFunc(trigger.Spec.RelativeURL, fh.handler)
 		ht.Methods(trigger.Spec.Method)
 		if trigger.Spec.Host != "" {
 			ht.Host(trigger.Spec.Host)

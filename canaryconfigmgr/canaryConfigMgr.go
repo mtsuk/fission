@@ -18,16 +18,16 @@ package canaryconfigmgr
 
 import (
 	"log"
+	"context"
+	"time"
 
 	k8sCache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/kubernetes"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/fields"
 
 	"github.com/fission/fission/crd"
-	"time"
-	"k8s.io/apimachinery/pkg/fields"
-	"context"
 )
 
 type canaryConfigMgr struct {
@@ -85,6 +85,10 @@ func(canaryCfgMgr *canaryConfigMgr) initCanaryConfigController() (k8sCache.Store
 			},
 		})
 	return store, controller
+}
+
+func (canaryCfgMgr *canaryConfigMgr) Run(ctx context.Context) {
+	go canaryCfgMgr.canaryConfigController.Run(ctx.Done())
 }
 
 func(canaryCfgMgr *canaryConfigMgr) addCanaryConfig(canaryConfig *crd.CanaryConfig) {
