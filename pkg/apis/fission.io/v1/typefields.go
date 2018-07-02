@@ -317,7 +317,7 @@ type (
 	}
 
 
-	FailureType int
+	FailureType string
 
 	// Canary Config
 	CanaryConfigSpec struct {

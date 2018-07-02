@@ -80,3 +80,7 @@ const (
 	//   Versioned function. by semver "latest compatible"
 	//   Set of function references (recursively), by percentage of traffic
 )
+
+const (
+	FailureTypeStatusCode FailureType = "status-code"
+)

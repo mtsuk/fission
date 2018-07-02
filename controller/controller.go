@@ -23,7 +23,6 @@ import (
 	"github.com/fission/fission"
 	"github.com/fission/fission/crd"
 	"github.com/fission/fission/canaryconfigmgr"
-	"github.com/fission/fission/executor"
 )
 
 func Start(port int) {

@@ -17,7 +17,7 @@ limitations under the License.
 package canaryconfigmgr
 
 import (
-	"log"
+	log "github.com/sirupsen/logrus"
 	"context"
 	"time"
 
@@ -84,14 +84,17 @@ func(canaryCfgMgr *canaryConfigMgr) initCanaryConfigController() (k8sCache.Store
 
 			},
 		})
+	log.Printf("Inited Configmgr controller")
 	return store, controller
 }
 
 func (canaryCfgMgr *canaryConfigMgr) Run(ctx context.Context) {
 	go canaryCfgMgr.canaryConfigController.Run(ctx.Done())
+	log.Printf("started Configmgr controller")
 }
 
 func(canaryCfgMgr *canaryConfigMgr) addCanaryConfig(canaryConfig *crd.CanaryConfig) {
+	log.Printf("addCanaryConfig called for %s", canaryConfig.Metadata.Name)
 	ctx, cancel := context.WithCancel(context.Background())
 	canaryCfgMgr.canaryCfgCancelFuncMap.assign(&canaryConfig.Metadata, &cancel)
 	canaryCfgMgr.processCanaryConfig(&ctx, canaryConfig)
@@ -112,6 +115,7 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 		select {
 		case <- (*ctx).Done():
 			// this case when someone deleted their canary config in the middle of it being processed
+			log.Printf("Cancel Func called for canary config : %s", canaryConfig.Metadata.Name)
 			ticker.Stop()
 			return
 
@@ -119,11 +123,13 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 			// every weightIncrementDuration, check if failureThreshold has reached.
 			// if yes, rollback.
 			// else, increment the weight of funcN and decrement funcN-1 by `weightIncrement`
+			log.Printf("Woken up by ticker for canary config : %s", canaryConfig.Metadata.Name)
 			canaryCfgMgr.IncrementWeightOrRollback(canaryConfig, quit, &firstIteration)
 
 		case <- quit:
 			// we're done processing this canary config either because the new function receives 100% of the traffic
 			// or we rolled back to send all 100% traffic to old function
+			log.Printf("Woken up by ticker for canary config : %s", canaryConfig.Metadata.Name)
 			ticker.Stop()
 			return
 		}
@@ -139,6 +145,8 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 		return
 	}
 
+	log.Printf("Fetched http trigger object :%s", canaryConfig.Spec.Trigger.Name)
+
 	var failurePercent float64
 	if ! *firstIteration {
 		*firstIteration = false
@@ -149,6 +157,8 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 			log.Printf("Error calculating failure percentage, err : %v", err)
 			return
 		}
+		log.Printf("Failure percentage calculated : %v for canaryConfig %s", failurePercent, canaryConfig.Metadata.Name)
+
 	}
 
 	if failurePercent == -1 {
@@ -161,6 +171,7 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 	// TODO : The right thing to do here is not pass the trigger object. because we might run into `StatusConflict` issue
 	// change it to do a get and then update inside rollback
 	if int(failurePercent) > canaryConfig.Spec.FailureThreshold {
+		log.Printf("Failure percent %v crossed the threshold %v, so rollingback", failurePercent, canaryConfig.Spec.FailureThreshold)
 		canaryCfgMgr.rollback(canaryConfig, triggerObj)
 		close(quit)
 		return
@@ -178,6 +189,7 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 		close(quit)
 		return
 	}
+	log.Printf("Finished this iteration of incrementWeightOrRollback for canaryConfig : %s", canaryConfig.Metadata.Name)
 }
 
 func(canaryCfgMgr *canaryConfigMgr) getHttpTriggerObject(triggerName, triggerNamespace string) (*crd.HTTPTrigger, error) {
@@ -198,7 +210,7 @@ func(canaryCfgMgr *canaryConfigMgr) rollback(canaryConfig *crd.CanaryConfig, tri
 		log.Printf("Error updating http trigger object, err : %v", err)
 		return err
 	}
-
+	log.Printf("Successfully updated http trigger for rollback : %v", trigger.Metadata.Name)
 	return nil
 }
 
@@ -220,6 +232,7 @@ func(canaryCfgMgr *canaryConfigMgr) incrementWeights(canaryConfig *crd.CanaryCon
 		}
 	}
 
+	log.Printf("Final incremented functionWeights : %v", functionWeights)
 	trigger.Spec.FunctionReference.FunctionWeights = functionWeights
 
 	_, err := canaryCfgMgr.fissionClient.HTTPTriggers(trigger.Metadata.Namespace).Update(trigger)
@@ -228,6 +241,7 @@ func(canaryCfgMgr *canaryConfigMgr) incrementWeights(canaryConfig *crd.CanaryCon
 		return doneProcessingCanaryConfig, err
 	}
 
+	log.Printf("Successfully updated http trigger obj for incrementWeights : %s", trigger.Metadata.Name)
 	return doneProcessingCanaryConfig, nil
 }
 
@@ -242,6 +256,7 @@ func(canaryCfgMgr *canaryConfigMgr) reSyncCanaryConfigs() {
 }
 
 func(canaryCfgMgr *canaryConfigMgr) deleteCanaryConfig(canaryConfig *crd.CanaryConfig) {
+	log.Printf("Delete event received for canary config : %v", canaryConfig.Metadata.Name)
 	cancelFunc, err := canaryCfgMgr.canaryCfgCancelFuncMap.lookup(&canaryConfig.Metadata)
 	if err != nil {
 		log.Printf("Something's wrong, lookup of canaryConfig failed, err : %v", err)
@@ -253,6 +268,9 @@ func(canaryCfgMgr *canaryConfigMgr) deleteCanaryConfig(canaryConfig *crd.CanaryC
 
 
 func(canaryCfgMgr *canaryConfigMgr) updateCanaryConfig(oldCanaryConfig *crd.CanaryConfig, newCanaryConfig *crd.CanaryConfig) {
+	// before removing the object from cache, we need to get it's cancel func and cancel it
+	canaryCfgMgr.deleteCanaryConfig(oldCanaryConfig)
+
 	err := canaryCfgMgr.canaryCfgCancelFuncMap.remove(&oldCanaryConfig.Metadata)
 	if err != nil {
 		log.Printf("Something's wrong, error removing canary config: %s from map, err : %v", oldCanaryConfig.Metadata.Name, err)

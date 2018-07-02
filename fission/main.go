@@ -272,8 +272,7 @@ func main() {
 		{Name: "error", Usage: "count of errored requests to function", Flags: []cli.Flag{fnMetricsNameFlag, windowFlag, urlFlag}, Action: metricsTotalErrorCount},
 	}
 
-
-		app.Commands = []cli.Command{
+	app.Commands = []cli.Command{
 		{Name: "function", Aliases: []string{"fn"}, Usage: "Create, update and manage functions", Subcommands: fnSubcommands},
 		{Name: "httptrigger", Aliases: []string{"ht", "route"}, Usage: "Manage HTTP triggers (routes) for functions", Subcommands: htSubcommands},
 		{Name: "timetrigger", Aliases: []string{"tt", "timer"}, Usage: "Manage Time triggers (timers) for functions", Subcommands: ttSubcommands},
