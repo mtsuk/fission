@@ -47,6 +47,7 @@ func MakeCanaryConfigMgr(fissionClient *crd.FissionClient, kubeClient *kubernete
 		crdClient: crdClient,
 		// TODO : Remove this hard code after testing and have a check for prometheus service being up
 		promClient: MakePrometheusClient("http://smelly-wildebeest-prometheus-server"),
+		canaryCfgCancelFuncMap: makecanaryConfigCancelFuncMap(),
 	}
 
 	store, controller := configMgr.initCanaryConfigController()
@@ -129,7 +130,7 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 		case <- quit:
 			// we're done processing this canary config either because the new function receives 100% of the traffic
 			// or we rolled back to send all 100% traffic to old function
-			log.Printf("Woken up by ticker for canary config : %s", canaryConfig.Metadata.Name)
+			log.Printf("Quitting processing canaryConfig : %s", canaryConfig.Metadata.Name)
 			ticker.Stop()
 			return
 		}
@@ -147,19 +148,15 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 
 	log.Printf("Fetched http trigger object :%s", canaryConfig.Spec.Trigger.Name)
 
-	var failurePercent float64
-	if ! *firstIteration {
-		*firstIteration = false
-		failurePercent, err = canaryCfgMgr.promClient.GetFunctionFailurePercentage(triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
-		canaryConfig.Spec.FunctionN, canaryConfig.Metadata.Namespace, canaryConfig.Spec.WeightIncrementDuration)
-		if err != nil {
-			// silently ignore. wait for next window to increment weight
-			log.Printf("Error calculating failure percentage, err : %v", err)
-			return
-		}
-		log.Printf("Failure percentage calculated : %v for canaryConfig %s", failurePercent, canaryConfig.Metadata.Name)
-
+	failurePercent, err := canaryCfgMgr.promClient.GetFunctionFailurePercentage(triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
+	canaryConfig.Spec.FunctionN, canaryConfig.Metadata.Namespace, canaryConfig.Spec.WeightIncrementDuration, *firstIteration)
+	if err != nil {
+		// silently ignore. wait for next window to increment weight
+		log.Printf("Error calculating failure percentage, err : %v", err)
+		return
 	}
+	log.Printf("Failure percentage calculated : %v for canaryConfig %s", failurePercent, canaryConfig.Metadata.Name)
+	*firstIteration = false
 
 	if failurePercent == -1 {
 		// this means there were no requests triggered to this url during this window. return here and check back
@@ -219,7 +216,7 @@ func(canaryCfgMgr *canaryConfigMgr) incrementWeights(canaryConfig *crd.CanaryCon
 	doneProcessingCanaryConfig := false
 
 	functionWeights := trigger.Spec.FunctionReference.FunctionWeights
-	if functionWeights[canaryConfig.Spec.FunctionN] + canaryConfig.Spec.WeightIncrement > 100 {
+	if functionWeights[canaryConfig.Spec.FunctionN] + canaryConfig.Spec.WeightIncrement >= 100 {
 		doneProcessingCanaryConfig = true
 		functionWeights[canaryConfig.Spec.FunctionN] = 100
 		functionWeights[canaryConfig.Spec.FunctionNminus1] = 0

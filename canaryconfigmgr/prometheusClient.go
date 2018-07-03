@@ -36,11 +36,11 @@ func MakePrometheusClient(prometheusSvc string) *PrometheusApiClient {
 	}
 }
 
-func(promApi *PrometheusApiClient) GetTotalRequestToUrl(path string, method string, window string) (float64, error) {
+func(promApi *PrometheusApiClient) GetTotalRequestToUrl(path string, method string, window string, getLatestValue bool) (float64, error) {
 	queryString := fmt.Sprintf("fission_function_calls_total{path=\"%s\",method=\"%s\"}[%v]", path, method, window)
 	log.Printf("Querying total function calls for : %s ", queryString)
 
-	totalRequestToUrl, err := promApi.executeQuery(queryString)
+	totalRequestToUrl, err := promApi.executeQuery(queryString, getLatestValue)
 	if err != nil {
 		log.Printf("Error executing query : %s, err : %v", queryString, err)
 		return 0, err
@@ -51,11 +51,11 @@ func(promApi *PrometheusApiClient) GetTotalRequestToUrl(path string, method stri
 	return totalRequestToUrl, nil
 }
 
-func (promApi *PrometheusApiClient) GetTotalFailedRequestsToFunc(funcName string, funcNs string, path string, window string) (float64, error) {
+func (promApi *PrometheusApiClient) GetTotalFailedRequestsToFunc(funcName string, funcNs string, path string, window string, getLatestValue bool) (float64, error) {
 	queryString := fmt.Sprintf("fission_function_errors_total{name=\"%s\",namespace=\"%s\",path=\"%s\"}[%v]", funcName, funcNs, path, window)
 	log.Printf("Querying fission_function_errors_total qs : %s", queryString)
 
-	totalFailedRequestToFunc, err := promApi.executeQuery(queryString)
+	totalFailedRequestToFunc, err := promApi.executeQuery(queryString, getLatestValue)
 	if err != nil {
 		log.Printf("Error executing query : %s, err : %v", queryString, err)
 		return 0, err
@@ -65,10 +65,10 @@ func (promApi *PrometheusApiClient) GetTotalFailedRequestsToFunc(funcName string
 	return totalFailedRequestToFunc, nil
 }
 
-func(promApi *PrometheusApiClient) GetFunctionFailurePercentage(path, method, funcName, funcNs string, window string) (float64, error) {
+func(promApi *PrometheusApiClient) GetFunctionFailurePercentage(path, method, funcName, funcNs string, window string, getLatestValue bool) (float64, error) {
 
 	// first get a total count of requests to this url in a time window
-	totalRequestToUrl, err := promApi.GetTotalRequestToUrl(path, method, window)
+	totalRequestToUrl, err := promApi.GetTotalRequestToUrl(path, method, window, getLatestValue)
 	if err != nil {
 		return 0, err
 	}
@@ -78,7 +78,7 @@ func(promApi *PrometheusApiClient) GetFunctionFailurePercentage(path, method, fu
 	}
 
 	// next, get a total count of errored out requests to this function in the same window
-	totalFailedRequestToFunc, err := promApi.GetTotalFailedRequestsToFunc(funcName, funcNs, path, window)
+	totalFailedRequestToFunc, err := promApi.GetTotalFailedRequestsToFunc(funcName, funcNs, path, window, getLatestValue)
 	if err != nil {
 		return 0, err
 	}
@@ -90,7 +90,7 @@ func(promApi *PrometheusApiClient) GetFunctionFailurePercentage(path, method, fu
 	return failurePercentForFunc, nil
 }
 
-func(promApi *PrometheusApiClient) executeQuery(queryString string) (float64, error) {
+func(promApi *PrometheusApiClient) executeQuery(queryString string, getLatestValue bool) (float64, error) {
 	val, err := promApi.client.Query(context.Background(), queryString, time.Now())
 	if err != nil {
 		// TODO : Add retries in cases of dial tcp error
@@ -122,7 +122,7 @@ func(promApi *PrometheusApiClient) executeQuery(queryString string) (float64, er
 		matrixVal := val.(model.Matrix)
 		total := float64(0)
 		for _, elem := range matrixVal {
-			if len(elem.Values) > 1 {
+			if len(elem.Values) > 1 && !getLatestValue {
 				firstValue := float64(elem.Values[0].Value)
 				lastValue := float64(elem.Values[len(elem.Values)-1].Value)
 				log.Printf("labels : %v, firstValue: %v @ ts : %v, lastValue : %v @ts : %v ", elem.Metric, firstValue, elem.Values[0].Timestamp, lastValue, elem.Values[len(elem.Values)-1].Timestamp)
@@ -132,7 +132,7 @@ func(promApi *PrometheusApiClient) executeQuery(queryString string) (float64, er
 				total += diff
 			} else {
 				log.Printf("Only one value, so taking the 0th elem")
-				total += float64(elem.Values[0].Value)
+				total += float64(elem.Values[len(elem.Values)-1].Value)
 			}
 		}
 		log.Printf("Final total : %v", total)
