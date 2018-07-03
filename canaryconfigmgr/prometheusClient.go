@@ -36,8 +36,8 @@ func MakePrometheusClient(prometheusSvc string) *PrometheusApiClient {
 	}
 }
 
-func(promApi *PrometheusApiClient) GetTotalRequestToUrl(path string, method string, window string, getLatestValue bool) (float64, error) {
-	queryString := fmt.Sprintf("fission_function_calls_total{path=\"%s\",method=\"%s\"}[%v]", path, method, window)
+func(promApi *PrometheusApiClient) GetTotalRequestToFunc(path string, method string, funcName string, funcNs string, window string, getLatestValue bool) (float64, error) {
+	queryString := fmt.Sprintf("fission_function_calls_total{path=\"%s\",method=\"%s\",name=\"%s\",namespace=\"%s\"}[%v]", path, method, funcName, funcNs, window)
 	log.Printf("Querying total function calls for : %s ", queryString)
 
 	totalRequestToUrl, err := promApi.executeQuery(queryString, getLatestValue)
@@ -51,8 +51,8 @@ func(promApi *PrometheusApiClient) GetTotalRequestToUrl(path string, method stri
 	return totalRequestToUrl, nil
 }
 
-func (promApi *PrometheusApiClient) GetTotalFailedRequestsToFunc(funcName string, funcNs string, path string, window string, getLatestValue bool) (float64, error) {
-	queryString := fmt.Sprintf("fission_function_errors_total{name=\"%s\",namespace=\"%s\",path=\"%s\"}[%v]", funcName, funcNs, path, window)
+func (promApi *PrometheusApiClient) GetTotalFailedRequestsToFunc(funcName string, funcNs string, path string, method string, window string, getLatestValue bool) (float64, error) {
+	queryString := fmt.Sprintf("fission_function_errors_total{name=\"%s\",namespace=\"%s\",path=\"%s\", method=\"%s\"}[%v]", funcName, funcNs, path, method, window)
 	log.Printf("Querying fission_function_errors_total qs : %s", queryString)
 
 	totalFailedRequestToFunc, err := promApi.executeQuery(queryString, getLatestValue)
@@ -68,7 +68,7 @@ func (promApi *PrometheusApiClient) GetTotalFailedRequestsToFunc(funcName string
 func(promApi *PrometheusApiClient) GetFunctionFailurePercentage(path, method, funcName, funcNs string, window string, getLatestValue bool) (float64, error) {
 
 	// first get a total count of requests to this url in a time window
-	totalRequestToUrl, err := promApi.GetTotalRequestToUrl(path, method, window, getLatestValue)
+	totalRequestToUrl, err := promApi.GetTotalRequestToFunc(path, method, funcName, funcNs, window, getLatestValue)
 	if err != nil {
 		return 0, err
 	}
@@ -78,7 +78,7 @@ func(promApi *PrometheusApiClient) GetFunctionFailurePercentage(path, method, fu
 	}
 
 	// next, get a total count of errored out requests to this function in the same window
-	totalFailedRequestToFunc, err := promApi.GetTotalFailedRequestsToFunc(funcName, funcNs, path, window, getLatestValue)
+	totalFailedRequestToFunc, err := promApi.GetTotalFailedRequestsToFunc(funcName, funcNs, path, method, window, getLatestValue)
 	if err != nil {
 		return 0, err
 	}

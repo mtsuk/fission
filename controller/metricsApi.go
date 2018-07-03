@@ -21,12 +21,14 @@ import (
 	"net/http"
 )
 
-func (a *API) TotalRequestsToUrl(w http.ResponseWriter, r *http.Request) {
+func (a *API) TotalRequestsToFunc(w http.ResponseWriter, r *http.Request) {
 	//vars := mux.Vars(r)
 	//name := vars["configmap"]
 	url := a.extractQueryParamFromRequest(r, "url")
 	method := a.extractQueryParamFromRequest(r, "method")
 	timeDurationStr := a.extractQueryParamFromRequest(r, "window")
+	fn := a.extractQueryParamFromRequest(r, "function")
+	fns := a.extractQueryParamFromRequest(r, "namespace")
 	//timeDuration, err := time.ParseDuration(timeDurationStr)
 	//if err != nil {
 	//	log.Printf("Error parsing time duration :%v", err)
@@ -34,7 +36,7 @@ func (a *API) TotalRequestsToUrl(w http.ResponseWriter, r *http.Request) {
 	//	return
 	//}
 
-	result, err := a.promClient.GetTotalRequestToUrl(url, method, timeDurationStr, false)
+	result, err := a.promClient.GetTotalRequestToFunc(url, method, fn, fns, timeDurationStr, false)
 	if err != nil {
 		a.respondWithError(w, err)
 		return
@@ -62,8 +64,9 @@ func (a *API) TotalErrRequestCount(w http.ResponseWriter, r *http.Request) {
 	//	a.respondWithError(w, err)
 	//	return
 	//}
+	method := a.extractQueryParamFromRequest(r, "method")
 
-	result, err := a.promClient.GetTotalFailedRequestsToFunc(fn, fns, url, timeDurationStr, false)
+	result, err := a.promClient.GetTotalFailedRequestsToFunc(fn, fns, url, method, timeDurationStr, false)
 	if err != nil {
 		a.respondWithError(w, err)
 		return

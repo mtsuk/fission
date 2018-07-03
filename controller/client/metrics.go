@@ -22,9 +22,9 @@ import (
 	"net/http"
 )
 
-func (c *Client) TotalRequestToUrlGet(url, method, window string) (float64, error) {
+func (c *Client) TotalRequestToUrlGet(url, method, window, function, namespace string) (float64, error) {
 	relativeUrl := "metrics/requests"
-	relativeUrl += fmt.Sprintf("?url=%v&method=%v&window=%v", url, method, window)
+	relativeUrl += fmt.Sprintf("?url=%v&method=%v&window=%v&function=%v&namespace=%v", url, method, window, function, namespace)
 
 	resp, err := http.Get(c.url(relativeUrl))
 	if err != nil {
@@ -46,9 +46,9 @@ func (c *Client) TotalRequestToUrlGet(url, method, window string) (float64, erro
 	return result, nil
 }
 
-func (c *Client) TotalErrorRequestToFuncGet(function, namespace, window, url string) (float64, error) {
+func (c *Client) TotalErrorRequestToFuncGet(function, namespace, window, url, method string) (float64, error) {
 	relativeUrl := "metrics/error-requests"
-	relativeUrl += fmt.Sprintf("?function=%v&namespace=%v&window=%v&path=%v", function, namespace, window, url)
+	relativeUrl += fmt.Sprintf("?function=%v&namespace=%v&window=%v&path=%v&method=%v", function, namespace, window, url, method)
 
 	resp, err := http.Get(c.url(relativeUrl))
 	if err != nil {

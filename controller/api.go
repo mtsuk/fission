@@ -223,7 +223,7 @@ func (api *API) Serve(port int) {
 	r.HandleFunc("/v2/secrets/{secret}", api.SecretGet).Methods("GET")
 	r.HandleFunc("/v2/configmaps/{configmap}", api.ConfigMapGet).Methods("GET")
 
-	r.HandleFunc("/v2/metrics/requests", api.TotalRequestsToUrl).Methods("GET")
+	r.HandleFunc("/v2/metrics/requests", api.TotalRequestsToFunc).Methods("GET")
 	r.HandleFunc("/v2/metrics/error-requests", api.TotalErrRequestCount).Methods("GET")
 
 

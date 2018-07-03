@@ -11,8 +11,10 @@ func metricsTotalReqCount(c *cli.Context) error {
 	url := c.String("url")
 	method := c.String("method")
 	window := c.String("window")
+	fn := c.String("function")
+	ns := "default"
 
-	result, err := client.TotalRequestToUrlGet(url, method, window)
+	result, err := client.TotalRequestToUrlGet(url, method, window, fn, ns)
 	checkErr(err, "get metricsTotalReqCount")
 
 	fmt.Println(result)
@@ -26,8 +28,9 @@ func metricsTotalErrorCount(c *cli.Context) error {
 	ns := "default"
 	url := c.String("url")
 	window := c.String("window")
+	method := c.String("method")
 
-	result, err := client.TotalErrorRequestToFuncGet(fn, ns, window, url)
+	result, err := client.TotalErrorRequestToFuncGet(fn, ns, window, url, method)
 	checkErr(err, "get metricsTotalReqCount")
 
 	fmt.Println(result)
