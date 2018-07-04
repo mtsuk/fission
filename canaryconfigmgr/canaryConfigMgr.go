@@ -110,7 +110,7 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 
 	ticker := time.NewTicker(timeDuration)
 	quit := make(chan struct{})
-	firstIteration := true
+	iteration := 0
 
 	for {
 		select {
@@ -121,11 +121,12 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 			return
 
 		case <- ticker.C:
+			iteration += 1
 			// every weightIncrementDuration, check if failureThreshold has reached.
 			// if yes, rollback.
 			// else, increment the weight of funcN and decrement funcN-1 by `weightIncrement`
-			log.Printf("Woken up by ticker for canary config : %s", canaryConfig.Metadata.Name)
-			canaryCfgMgr.IncrementWeightOrRollback(canaryConfig, quit, &firstIteration)
+			log.Printf("Woken up by ticker for canary config : %s, iteration : %d", canaryConfig.Metadata.Name, iteration)
+			canaryCfgMgr.IncrementWeightOrRollback(canaryConfig, quit, &iteration)
 
 		case <- quit:
 			// we're done processing this canary config either because the new function receives 100% of the traffic
@@ -137,7 +138,7 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 	}
 }
 
-func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.CanaryConfig, quit chan struct{}, firstIteration *bool) {
+func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.CanaryConfig, quit chan struct{}, iteration *int) {
 	// get the http trigger object associated with this canary config
 	triggerObj, err := canaryCfgMgr.getHttpTriggerObject(canaryConfig.Spec.Trigger.Name, canaryConfig.Spec.Trigger.Namespace)
 	if err != nil {
@@ -148,30 +149,42 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 
 	log.Printf("Fetched http trigger object :%s", canaryConfig.Spec.Trigger.Name)
 
-	failurePercent, err := canaryCfgMgr.promClient.GetFunctionFailurePercentage(triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
-	canaryConfig.Spec.FunctionN, canaryConfig.Metadata.Namespace, canaryConfig.Spec.WeightIncrementDuration, *firstIteration)
-	if err != nil {
-		// silently ignore. wait for next window to increment weight
-		log.Printf("Error calculating failure percentage, err : %v", err)
-		return
-	}
-	log.Printf("Failure percentage calculated : %v for canaryConfig %s", failurePercent, canaryConfig.Metadata.Name)
-	*firstIteration = false
+	var getLatestValueFromMetrics bool
+	if *iteration != 1 {
 
-	if failurePercent == -1 {
-		// this means there were no requests triggered to this url during this window. return here and check back
-		// during next iteration
-		log.Printf("Total requests received for url : %v is 0", triggerObj.Spec.RelativeURL)
-		return
-	}
+		if *iteration == 2 {
+			getLatestValueFromMetrics = true
+		} else {
+			getLatestValueFromMetrics = false
+		}
 
-	// TODO : The right thing to do here is not pass the trigger object. because we might run into `StatusConflict` issue
-	// change it to do a get and then update inside rollback
-	if int(failurePercent) > canaryConfig.Spec.FailureThreshold {
-		log.Printf("Failure percent %v crossed the threshold %v, so rollingback", failurePercent, canaryConfig.Spec.FailureThreshold)
-		canaryCfgMgr.rollback(canaryConfig, triggerObj)
-		close(quit)
-		return
+		log.Printf("value of getLatestValueFromMetrics : %v, iteration : %v", getLatestValueFromMetrics, *iteration)
+
+		failurePercent, err := canaryCfgMgr.promClient.GetFunctionFailurePercentage(triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
+			canaryConfig.Spec.FunctionN, canaryConfig.Metadata.Namespace, canaryConfig.Spec.WeightIncrementDuration, getLatestValueFromMetrics)
+
+		if err != nil {
+			// silently ignore. wait for next window to increment weight
+			log.Printf("Error calculating failure percentage, err : %v", err)
+			return
+		}
+
+		log.Printf("Failure percentage calculated : %v for canaryConfig %s", failurePercent, canaryConfig.Metadata.Name)
+		if failurePercent == -1 {
+			// this means there were no requests triggered to this url during this window. return here and check back
+			// during next iteration
+			log.Printf("Total requests received for url : %v is 0", triggerObj.Spec.RelativeURL)
+			return
+		}
+
+		// TODO : The right thing to do here is not pass the trigger object. because we might run into `StatusConflict` issue
+		// change it to do a get and then update inside rollback
+		if int(failurePercent) > canaryConfig.Spec.FailureThreshold {
+			log.Printf("Failure percent %v crossed the threshold %v, so rollingback", failurePercent, canaryConfig.Spec.FailureThreshold)
+			canaryCfgMgr.rollback(canaryConfig, triggerObj)
+			close(quit)
+			return
+		}
 	}
 
 	doneProcessingCanaryConfig, err := canaryCfgMgr.incrementWeights(canaryConfig, triggerObj)
