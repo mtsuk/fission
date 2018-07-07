@@ -61,7 +61,8 @@ func MakeCanaryConfigMgr(fissionClient *crd.FissionClient, kubeClient *kubernete
 	return configMgr
 }
 
-
+// TODO : If fn updated once canary config is processed completely, we probably have to restart processing the corresponding canary config
+// That requires us to have a func watcher that basically calls `addCanaryConfig` in the occurrance of such an event.
 func(canaryCfgMgr *canaryConfigMgr) initCanaryConfigController() (k8sCache.Store, k8sCache.Controller) {
 	resyncPeriod := 30 * time.Second
 	listWatch := k8sCache.NewListWatchFromClient(canaryCfgMgr.crdClient, "canaryconfigs", metav1.NamespaceAll, fields.Everything())
@@ -125,7 +126,7 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 			// every weightIncrementDuration, check if failureThreshold has reached.
 			// if yes, rollback.
 			// else, increment the weight of funcN and decrement funcN-1 by `weightIncrement`
-			log.Printf("Woken up by ticker for canary config : %s, iteration : %d", canaryConfig.Metadata.Name, iteration)
+			log.Printf("\n\n Woken up by ticker for canary config : %s, iteration : %d", canaryConfig.Metadata.Name, iteration)
 			canaryCfgMgr.IncrementWeightOrRollback(canaryConfig, quit, &iteration)
 
 		case <- quit:
