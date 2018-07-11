@@ -51,6 +51,9 @@ type (
 	MessageQueueType             = fv1.MessageQueueType
 	MessageQueueTriggerSpec      = fv1.MessageQueueTriggerSpec
 	TimeTriggerSpec              = fv1.TimeTriggerSpec
+	CanaryConfigSpec 			 = fv1.CanaryConfigSpec
+	TriggerReference			 = fv1.TriggerReference
+	FailureType					 = fv1.FailureType
 )
 
 type (
@@ -195,4 +198,8 @@ const (
 	PackageGetterRB = "package-getter-binding"
 
 	ClusterRole = "ClusterRole"
+)
+
+const (
+	FailureTypeStatusCode = fv1.FailureTypeStatusCode
 )

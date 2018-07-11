@@ -20,6 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"context"
 	"time"
+	"os"
 
 	k8sCache "k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/kubernetes"
@@ -28,6 +29,9 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 
 	"github.com/fission/fission/crd"
+	"fmt"
+	"regexp"
+	"strings"
 )
 
 type canaryConfigMgr struct {
@@ -41,12 +45,28 @@ type canaryConfigMgr struct {
 }
 
 func MakeCanaryConfigMgr(fissionClient *crd.FissionClient, kubeClient *kubernetes.Clientset, crdClient *rest.RESTClient) (*canaryConfigMgr) {
+
+	// TODO : Come back to this
+	prometheusSvc := ""
+	for _, element := range os.Environ() {
+		variable := strings.Split(element, "=")
+		matched, _ := regexp.MatchString("PROMETHEUS_SERVER_SERVICE_HOST", variable[0])
+		if matched {
+			prometheusSvc = variable[1]
+			break
+		}
+	}
+
+	if prometheusSvc == "" {
+		log.Printf("Error finding prometheus Service, Env : %v", os.Environ())
+		return nil
+	}
+
 	configMgr := &canaryConfigMgr{
 		fissionClient: fissionClient,
 		kubeClient: kubeClient,
 		crdClient: crdClient,
-		// TODO : Remove this hard code after testing and have a check for prometheus service being up
-		promClient: MakePrometheusClient("http://smelly-wildebeest-prometheus-server"),
+		promClient: MakePrometheusClient(fmt.Sprintf("http://%s", prometheusSvc)),
 		canaryCfgCancelFuncMap: makecanaryConfigCancelFuncMap(),
 	}
 
@@ -54,9 +74,6 @@ func MakeCanaryConfigMgr(fissionClient *crd.FissionClient, kubeClient *kubernete
 	configMgr.canaryConfigStore = store
 	configMgr.canaryConfigController = controller
 
-	//log.Printf("Invoking promClient.GetFunctionFailurePercentage")
-	//configMgr.promClient.GetFunctionFailurePercentage("hello-nodejs", "default", 25 * time.Minute)
-	//log.Printf("Finished invoking promClient.GetFunctionFailurePercentage")
 
 	return configMgr
 }
@@ -126,13 +143,15 @@ func(canaryCfgMgr *canaryConfigMgr) processCanaryConfig(ctx *context.Context, ca
 			// every weightIncrementDuration, check if failureThreshold has reached.
 			// if yes, rollback.
 			// else, increment the weight of funcN and decrement funcN-1 by `weightIncrement`
-			log.Printf("\n\n Woken up by ticker for canary config : %s, iteration : %d", canaryConfig.Metadata.Name, iteration)
+			log.Println()
+			log.Println()
+			log.Printf("Processing canary config : %s, iteration : %d", canaryConfig.Metadata.Name, iteration)
 			canaryCfgMgr.IncrementWeightOrRollback(canaryConfig, quit, &iteration)
 
 		case <- quit:
 			// we're done processing this canary config either because the new function receives 100% of the traffic
 			// or we rolled back to send all 100% traffic to old function
-			log.Printf("Quitting processing canaryConfig : %s", canaryConfig.Metadata.Name)
+			log.Printf("Quit processing canaryConfig : %s", canaryConfig.Metadata.Name)
 			ticker.Stop()
 			return
 		}
@@ -148,7 +167,7 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 		return
 	}
 
-	log.Printf("Fetched http trigger object :%s", canaryConfig.Spec.Trigger.Name)
+	//log.Printf("Fetched http trigger object :%s", canaryConfig.Spec.Trigger.Name)
 
 	var getLatestValueFromMetrics bool
 	if *iteration != 1 {
@@ -159,7 +178,7 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 			getLatestValueFromMetrics = false
 		}
 
-		log.Printf("value of getLatestValueFromMetrics : %v, iteration : %v", getLatestValueFromMetrics, *iteration)
+		//log.Printf("value of getLatestValueFromMetrics : %v, iteration : %v", getLatestValueFromMetrics, *iteration)
 
 		failurePercent, err := canaryCfgMgr.promClient.GetFunctionFailurePercentage(triggerObj.Spec.RelativeURL, triggerObj.Spec.Method,
 			canaryConfig.Spec.FunctionN, canaryConfig.Metadata.Namespace, canaryConfig.Spec.WeightIncrementDuration, getLatestValueFromMetrics)
@@ -181,7 +200,7 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 		// TODO : The right thing to do here is not pass the trigger object. because we might run into `StatusConflict` issue
 		// change it to do a get and then update inside rollback
 		if int(failurePercent) > canaryConfig.Spec.FailureThreshold {
-			log.Printf("Failure percent %v crossed the threshold %v, so rollingback", failurePercent, canaryConfig.Spec.FailureThreshold)
+			log.Printf("Failure percent %v crossed the threshold %v, so rolling back", failurePercent, canaryConfig.Spec.FailureThreshold)
 			canaryCfgMgr.rollback(canaryConfig, triggerObj)
 			close(quit)
 			return
@@ -221,7 +240,7 @@ func(canaryCfgMgr *canaryConfigMgr) rollback(canaryConfig *crd.CanaryConfig, tri
 		log.Printf("Error updating http trigger object, err : %v", err)
 		return err
 	}
-	log.Printf("Successfully updated http trigger for rollback : %v", trigger.Metadata.Name)
+	//log.Printf("Successfully updated http trigger for rollback : %v", trigger.Metadata.Name)
 	return nil
 }
 
@@ -252,7 +271,7 @@ func(canaryCfgMgr *canaryConfigMgr) incrementWeights(canaryConfig *crd.CanaryCon
 		return doneProcessingCanaryConfig, err
 	}
 
-	log.Printf("Successfully updated http trigger obj for incrementWeights : %s", trigger.Metadata.Name)
+	//log.Printf("Successfully updated http trigger obj for incrementWeights : %s", trigger.Metadata.Name)
 	return doneProcessingCanaryConfig, nil
 }
 

@@ -102,7 +102,19 @@ func htCreate(c *cli.Context) error {
 		}
 	}
 
+	triggerName := c.String("name")
+	fmt.Sprintf("triggerName : %s", triggerName)
 	fnNamespace := c.String("fnNamespace")
+
+	m := &metav1.ObjectMeta{
+		Name:      triggerName,
+		Namespace: fnNamespace,
+	}
+
+	htTrigger, err := client.HTTPTriggerGet(m)
+	if htTrigger != nil {
+		checkErr(fmt.Errorf("duplicate trigger exists"), "choose a different name or leave it empty for fission to auto-generate it")
+	}
 
 	triggerUrl := c.String("url")
 	if len(triggerUrl) == 0 {
@@ -127,7 +139,9 @@ func htCreate(c *cli.Context) error {
 	host := c.String("host")
 
 	// just name triggers by uuid.
-	triggerName := uuid.NewV4().String()
+	if triggerName == "" {
+		triggerName = uuid.NewV4().String()
+	}
 
 	ht := &crd.HTTPTrigger{
 		Metadata: metav1.ObjectMeta{
@@ -154,7 +168,7 @@ func htCreate(c *cli.Context) error {
 		return nil
 	}
 
-	_, err := client.HTTPTriggerCreate(ht)
+	_, err = client.HTTPTriggerCreate(ht)
 	checkErr(err, "create HTTP trigger")
 
 	fmt.Printf("trigger '%v' created\n", triggerName)
@@ -162,7 +176,39 @@ func htCreate(c *cli.Context) error {
 }
 
 func htGet(c *cli.Context) error {
-	return nil
+	cliClient := getClient(c.GlobalString("server"))
+
+	name := c.String("name")
+	ns := c.String("fnNamespace")
+
+	m := &metav1.ObjectMeta{
+		Name:      name,
+		Namespace: ns,
+	}
+
+	htTrigger, err := cliClient.HTTPTriggerGet(m)
+	checkErr(err, "get http trigger")
+
+	w := tabwriter.NewWriter(os.Stdout, 0, 1, 1, ' ', 0)
+
+	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\n", "NAME", "UID", "METHOD", "RELATIVE-URL", "FUNCTION-REFERENCE-TYPE", "FUNCTION(s)")
+
+	function := ""
+	if htTrigger.Spec.FunctionReference.Type == fission.FunctionReferenceTypeFunctionName {
+		function = htTrigger.Spec.FunctionReference.Name
+	} else {
+		for k, v := range htTrigger.Spec.FunctionReference.FunctionWeights {
+			function += fmt.Sprintf("%s:%v ", k, v)
+		}
+	}
+
+	fmt.Fprintf(w, "%v\t%v\t%v\t%v\t%v\t%v\n",
+		htTrigger.Metadata.Name, htTrigger.Metadata.UID, htTrigger.Spec.Method, htTrigger.Spec.RelativeURL,
+		htTrigger.Spec.FunctionReference.Type, function)
+
+	w.Flush()
+
+	return err
 }
 
 func htUpdate(c *cli.Context) error {

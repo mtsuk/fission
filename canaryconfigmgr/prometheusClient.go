@@ -98,7 +98,7 @@ func(promApi *PrometheusApiClient) executeQuery(queryString string, getLatestVal
 		return 0, err
 	}
 
-	log.Printf("Value retrieved from query : %v", val)
+	//log.Printf("Value retrieved from query : %v", val)
 
 	switch {
 	case val.Type() == model.ValScalar:
@@ -118,20 +118,20 @@ func(promApi *PrometheusApiClient) executeQuery(queryString string, getLatestVal
 		return total, nil
 
 	case val.Type() == model.ValMatrix:
-		log.Printf("value type is matrix")
+		//log.Printf("value type is matrix")
 		matrixVal := val.(model.Matrix)
 		total := float64(0)
 		for _, elem := range matrixVal {
 			if len(elem.Values) > 1 && !getLatestValue {
 				firstValue := float64(elem.Values[0].Value)
 				lastValue := float64(elem.Values[len(elem.Values)-1].Value)
-				log.Printf("labels : %v, firstValue: %v @ ts : %v, lastValue : %v @ts : %v ", elem.Metric, firstValue, elem.Values[0].Timestamp, lastValue, elem.Values[len(elem.Values)-1].Timestamp)
+				//log.Printf("labels : %v, firstValue: %v @ ts : %v, lastValue : %v @ts : %v ", elem.Metric, firstValue, elem.Values[0].Timestamp, lastValue, elem.Values[len(elem.Values)-1].Timestamp)
 
 				diff := math.Abs(lastValue - firstValue)
-				log.Printf("diff : %v", diff)
+				//log.Printf("diff : %v", diff)
 				total += diff
 			} else {
-				log.Printf("Only one value, so taking the 0th elem")
+				//log.Printf("Only one value, so taking the 0th elem")
 				total += float64(elem.Values[len(elem.Values)-1].Value)
 			}
 		}
