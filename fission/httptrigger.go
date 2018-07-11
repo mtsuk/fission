@@ -17,7 +17,6 @@ limitations under the License.
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -78,8 +77,8 @@ func htCreate(c *cli.Context) error {
 	functionList := c.StringSlice("function")
 	functionWeightsList := c.IntSlice("weight")
 
-	fmt.Printf("fn array : %v", functionList)
-	fmt.Printf("weight array : %v", functionWeightsList)
+	//fmt.Printf("fn array : %v", functionList)
+	//fmt.Printf("weight array : %v", functionWeightsList)
 
 	if len(functionList) == 0 {
 		fatal("Need a function name to create a trigger, use --function")
@@ -106,15 +105,16 @@ func htCreate(c *cli.Context) error {
 	fmt.Sprintf("triggerName : %s", triggerName)
 	fnNamespace := c.String("fnNamespace")
 
-	m := &metav1.ObjectMeta{
-		Name:      triggerName,
-		Namespace: fnNamespace,
-	}
-
-	htTrigger, err := client.HTTPTriggerGet(m)
-	if htTrigger != nil {
-		checkErr(fmt.Errorf("duplicate trigger exists"), "choose a different name or leave it empty for fission to auto-generate it")
-	}
+	// TODO : Fix this check later
+	//m := &metav1.ObjectMeta{
+	//	Name:      triggerName,
+	//	Namespace: fnNamespace,
+	//}
+	//
+	//htTrigger, err := client.HTTPTriggerGet(m)
+	//if htTrigger != nil {
+	//	checkErr(fmt.Errorf("duplicate trigger exists"), "choose a different name or leave it empty for fission to auto-generate it")
+	//}
 
 	triggerUrl := c.String("url")
 	if len(triggerUrl) == 0 {
@@ -157,8 +157,8 @@ func htCreate(c *cli.Context) error {
 		},
 	}
 
-	res2B, _ := json.Marshal(ht)
-	fmt.Println(string(res2B))
+	//res2B, _ := json.Marshal(ht)
+	//fmt.Println(string(res2B))
 
 	// if we're writing a spec, don't call the API
 	if c.Bool("spec") {
@@ -168,7 +168,7 @@ func htCreate(c *cli.Context) error {
 		return nil
 	}
 
-	_, err = client.HTTPTriggerCreate(ht)
+	_, err := client.HTTPTriggerCreate(ht)
 	checkErr(err, "create HTTP trigger")
 
 	fmt.Printf("trigger '%v' created\n", triggerName)

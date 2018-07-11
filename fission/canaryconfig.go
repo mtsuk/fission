@@ -39,15 +39,15 @@ func canaryConfigCreate(c *cli.Context) error {
 	// TODO : Allow namespace
 	ns := "default"
 
-	m := &metav1.ObjectMeta{
-		Name:      canaryConfigName,
-		Namespace: ns,
-	}
+	//m := &metav1.ObjectMeta{
+	//	Name:      canaryConfigName,
+	//	Namespace: ns,
+	//}
 
-	canaryCfg, err := client.CanaryConfigGet(m)
-	if  canaryCfg != nil {
-		checkErr(fmt.Errorf("duplicate canary config"), "Another canary config with the same name exists")
-	}
+	//canaryCfg, err := client.CanaryConfigGet(m)
+	//if  canaryCfg != nil {
+	//	checkErr(fmt.Errorf("duplicate canary config"), "Another canary config with the same name exists")
+	//}
 
 	trigger := c.String("trigger")
 	funcN := c.String("funcN")
@@ -59,7 +59,7 @@ func canaryConfigCreate(c *cli.Context) error {
 
 	// TODO : Validation check for time parsing
 
-	canaryCfg = &crd.CanaryConfig{
+	canaryCfg := &crd.CanaryConfig{
 		Metadata: metav1.ObjectMeta{
 			Name:      canaryConfigName,
 			Namespace: ns,
@@ -78,7 +78,7 @@ func canaryConfigCreate(c *cli.Context) error {
 		},
 	}
 
-	_, err = client.CanaryConfigCreate(canaryCfg)
+	_, err := client.CanaryConfigCreate(canaryCfg)
 	checkErr(err, "create canary config")
 
 	fmt.Printf("canary config '%v' created\n", canaryConfigName)

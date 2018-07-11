@@ -103,13 +103,13 @@ func(canaryCfgMgr *canaryConfigMgr) initCanaryConfigController() (k8sCache.Store
 
 			},
 		})
-	log.Printf("Inited Configmgr controller")
+	//log.Printf("Inited Configmgr controller")
 	return store, controller
 }
 
 func (canaryCfgMgr *canaryConfigMgr) Run(ctx context.Context) {
 	go canaryCfgMgr.canaryConfigController.Run(ctx.Done())
-	log.Printf("started Configmgr controller")
+	log.Printf("started Canary configmgr controller")
 }
 
 func(canaryCfgMgr *canaryConfigMgr) addCanaryConfig(canaryConfig *crd.CanaryConfig) {
@@ -219,7 +219,7 @@ func(canaryCfgMgr *canaryConfigMgr) IncrementWeightOrRollback(canaryConfig *crd.
 		close(quit)
 		return
 	}
-	log.Printf("Finished this iteration of incrementWeightOrRollback for canaryConfig : %s", canaryConfig.Metadata.Name)
+	//log.Printf("Finished this iteration of incrementWeightOrRollback for canaryConfig : %s", canaryConfig.Metadata.Name)
 }
 
 func(canaryCfgMgr *canaryConfigMgr) getHttpTriggerObject(triggerName, triggerNamespace string) (*crd.HTTPTrigger, error) {
@@ -286,7 +286,7 @@ func(canaryCfgMgr *canaryConfigMgr) reSyncCanaryConfigs() {
 }
 
 func(canaryCfgMgr *canaryConfigMgr) deleteCanaryConfig(canaryConfig *crd.CanaryConfig) {
-	log.Printf("Delete event received for canary config : %v", canaryConfig.Metadata.Name)
+	log.Printf("Delete event received for canary config : %v, %v, %v", canaryConfig.Metadata.Name, canaryConfig.Metadata.Namespace, canaryConfig.Metadata.ResourceVersion)
 	cancelFunc, err := canaryCfgMgr.canaryCfgCancelFuncMap.lookup(&canaryConfig.Metadata)
 	if err != nil {
 		log.Printf("Something's wrong, lookup of canaryConfig failed, err : %v", err)
