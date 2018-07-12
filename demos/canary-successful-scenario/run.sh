@@ -32,49 +32,49 @@ sleep 2
 # TODO : Find a way to do the below in a for loop
 
 desc "Fire requests to the route"
-run "ab -n 35 -c 7 http://$FISSION_ROUTER/hello"
+run "ab -n 10000 -c 1 http://$FISSION_ROUTER/hello"
 
-desc "Check the current weight distribution"
-run "fission route get --name route-hello"
-
-desc "Wait for a few seconds"
-run "sleep 30"
-
-desc "Fire more requests to the route"
-run "ab -n 35 -c 7 http://$FISSION_ROUTER/hello"
-
-desc "Check the current weight distribution"
-run "fission route get --name route-hello"
-
-desc "Wait for a few seconds"
-run "sleep 30"
-
-desc "Fire more requests to the route"
-run "ab -n 35 -c 7 http://$FISSION_ROUTER/hello"
-
-desc "Check the current weight distribution"
-run "fission route get --name route-hello"
-
-desc "Wait for a few seconds"
-run "sleep 30"
-
-desc "Check the current weight distribution"
-run "fission route get --name route-hello"
-
-desc "Fire more requests to the route"
-run "ab -n 35 -c 7 http://$FISSION_ROUTER/hello"
-
-desc "Check the current weight distribution"
-run "fission route get --name route-hello"
-
-desc "Wait for a few seconds"
-run "sleep 30"
-
-desc "Fire more requests to the route"
-run "ab -n 35 -c 7 http://$FISSION_ROUTER/hello"
-
-desc "Check the current weight distribution"
-run "fission route get --name route-hello"
-
-desc "Wait for a few seconds"
-run "sleep 30"
+#desc "Check the current weight distribution"
+#run "fission route get --name route-hello"
+#
+#desc "Wait for a few seconds"
+#run "sleep 30"
+#
+#desc "Fire more requests to the route"
+#run "ab -n 35 -c 7 http://$FISSION_ROUTER/hello"
+#
+#desc "Check the current weight distribution"
+#run "fission route get --name route-hello"
+#
+#desc "Wait for a few seconds"
+#run "sleep 30"
+#
+#desc "Fire more requests to the route"
+#run "ab -n 35 -c 7 http://$FISSION_ROUTER/hello"
+#
+#desc "Check the current weight distribution"
+#run "fission route get --name route-hello"
+#
+#desc "Wait for a few seconds"
+#run "sleep 30"
+#
+#desc "Check the current weight distribution"
+#run "fission route get --name route-hello"
+#
+#desc "Fire more requests to the route"
+#run "ab -n 35 -c 7 http://$FISSION_ROUTER/hello"
+#
+#desc "Check the current weight distribution"
+#run "fission route get --name route-hello"
+#
+#desc "Wait for a few seconds"
+#run "sleep 30"
+#
+#desc "Fire more requests to the route"
+#run "ab -n 35 -c 7 http://$FISSION_ROUTER/hello"
+#
+#desc "Check the current weight distribution"
+#run "fission route get --name route-hello"
+#
+#desc "Wait for a few seconds"
+#run "sleep 30"
